@@ -89,6 +89,11 @@ function mouseDown (e) {
     type: eventType
   };
 
+  const onMouseDown = $(element).data('onMouseDown');
+  if (onMouseDown) {
+    onMouseDown(eventData);
+  }
+
   const event = $.Event(eventType, eventData);
 
   $(eventData.element).trigger(event, eventData);
@@ -133,7 +138,10 @@ function mouseDown (e) {
       lastPoints,
       currentPoints,
       deltaPoints,
-      type: eventType
+      type: eventType,
+      ctrlKey : e.ctrlKey,
+      metaKey : e.metaKey,
+      shiftKey : e.shiftKey
     };
 
     $(eventData.element).trigger(eventType, eventData);
