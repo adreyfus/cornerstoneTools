@@ -2510,18 +2510,14 @@ var numRequests = {
   autoPrefetch: 0
 };
 
-var maxNumRequests = {
-  interaction: 6,
-  thumbnail: 6,
-  prefetch: 5
-};
+var maxNumRequests = void 0;
 
 var awake = false;
 var grabDelay = 20;
 
-function addRequest(element, imageId, type, preventCache, doneCallback, failCallback) {
+function addRequest(element, imageId, type, preventCache, doneCallback, failCallback, pendingCallback) {
   if (!requestPool.hasOwnProperty(type)) {
-    throw new Error('Request type must be one of interaction, thumbnail, or prefetch');
+    throw new Error('Request type must be one of interaction, thumbnail, prefetch, or autoPrefetch');
   }
 
   if (!element || !imageId) {
@@ -2537,8 +2533,21 @@ function addRequest(element, imageId, type, preventCache, doneCallback, failCall
     failCallback: failCallback
   };
 
+  // Auto retry
+  if (configuration.retryLoad === true) {
+    var cachedImagePromise = cornerstone.imageCache.getImagePromise(imageId);
+
+    if (cachedImagePromise && cachedImagePromise.state() === 'rejected') {
+      cornerstone.imageCache.removeImagePromise(imageId);
+    }
+  }
+
   // If this imageId is in the cache, resolve it immediately
   var imagePromise = cornerstone.imageCache.getImagePromise(imageId);
+
+  if (pendingCallback && (imagePromise === undefined || imagePromise.state() === 'pending')) {
+    pendingCallback();
+  }
 
   if (imagePromise) {
     imagePromise.then(function (image) {
@@ -12326,7 +12335,7 @@ function playClip(element, framesPerSecond) {
   var playClipAction = function playClipAction() {
 
     // Hoisting of context variables
-    var imagePromise = void 0,
+    var loader = void 0,
         viewport = void 0,
         startLoadingHandler = void 0,
         displayLoadingHandler = void 0,
@@ -12372,18 +12381,18 @@ function playClip(element, framesPerSecond) {
       viewport = cornerstone.getViewport(element);
 
       if (stackData.preventCache === true) {
-        imagePromise = cornerstone.loadImage(stackData.imageIds[newImageIdIndex]);
+        loader = cornerstone.loadImage(stackData.imageIds[newImageIdIndex]);
       } else {
-        imagePromise = cornerstone.loadAndCacheImage(stackData.imageIds[newImageIdIndex]);
+        loader = cornerstone.loadAndCacheImage(stackData.imageIds[newImageIdIndex]);
       }
 
-      if (displayLoadingHandler && (imagePromise === undefined || imagePromise.state() === 'pending')) {
+      if (displayLoadingHandler && (loader === undefined || loader.state() === 'pending')) {
         var imageId = stackData.imageIds[newImageIdIndex];
 
         displayLoadingHandler(element, imageId);
       }
 
-      imagePromise.then(function (image) {
+      loader.then(function (image) {
         stackData.currentImageIdIndex = newImageIdIndex;
         cornerstone.displayImage(element, image, viewport);
         if (endLoadingHandler) {
