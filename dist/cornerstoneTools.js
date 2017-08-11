@@ -1,4 +1,4 @@
-/*! cornerstone-tools - 0.9.0 - 2017-06-28 | (c) 2017 Chris Hafey | https://github.com/chafey/cornerstoneTools */
+/*! cornerstone-tools - 0.9.0 - 2017-08-11 | (c) 2017 Chris Hafey | https://github.com/chafey/cornerstoneTools */
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
 		module.exports = factory(require("cornerstone-core"), require("cornerstone-math"), require("hammerjs"));
@@ -1263,6 +1263,7 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 var defaultStartLoadHandler = void 0;
+var defaultDisplayLoadingHandler = void 0;
 var defaultEndLoadHandler = void 0;
 var defaultErrorLoadingHandler = void 0;
 
@@ -1272,6 +1273,14 @@ function setStartLoadHandler(handler) {
 
 function getStartLoadHandler() {
   return defaultStartLoadHandler;
+}
+
+function setDisplayLoadingHandler(handler) {
+  defaultDisplayLoadingHandler = handler;
+}
+
+function getDisplayLoadingHandler() {
+  return defaultDisplayLoadingHandler;
 }
 
 function setEndLoadHandler(handler) {
@@ -1293,6 +1302,8 @@ function getErrorLoadingHandler() {
 var loadHandlerManager = {
   setStartLoadHandler: setStartLoadHandler,
   getStartLoadHandler: getStartLoadHandler,
+  setDisplayLoadingHandler: setDisplayLoadingHandler,
+  getDisplayLoadingHandler: getDisplayLoadingHandler,
   setEndLoadHandler: setEndLoadHandler,
   getEndLoadHandler: getEndLoadHandler,
   setErrorLoadingHandler: setErrorLoadingHandler,
@@ -2483,16 +2494,20 @@ var _getMaxSimultaneousRequests = __webpack_require__(24);
 
 function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) newObj[key] = obj[key]; } } newObj.default = obj; return newObj; } }
 
+var configuration = {};
+
 var requestPool = {
   interaction: [],
   thumbnail: [],
-  prefetch: []
+  prefetch: [],
+  autoPrefetch: []
 };
 
 var numRequests = {
   interaction: 0,
   thumbnail: 0,
-  prefetch: 0
+  prefetch: 0,
+  autoPrefetch: 0
 };
 
 var maxNumRequests = {
@@ -2537,6 +2552,24 @@ function addRequest(element, imageId, type, preventCache, doneCallback, failCall
 
   // Add it to the end of the stack
   requestPool[type].push(requestDetails);
+}
+
+function addPriorRequests(element, imageIdList, requestType, preventCache, doneCallback, failCallback, pendingCallback) {
+  // Save the previously queued requests
+  var oldRequestQueue = getRequestPool()[requestType].slice();
+
+  // Clear the requests queue
+  clearRequestStack(requestType);
+
+  // Add the prior requests
+  for (var i = 0; i < imageIdList.length; i++) {
+    var imageId = imageIdList[i];
+
+    addRequest(element, imageId, requestType, preventCache, doneCallback, failCallback, pendingCallback);
+  }
+
+  // Add the previously queued requests
+  Array.prototype.push.apply(getRequestPool()[requestType], oldRequestQueue);
 }
 
 function clearRequestStack(type) {
@@ -2638,7 +2671,8 @@ function startGrabbing() {
   maxNumRequests = {
     interaction: Math.max(maxSimultaneousRequests, 1),
     thumbnail: Math.max(maxSimultaneousRequests - 2, 1),
-    prefetch: Math.max(maxSimultaneousRequests - 1, 1)
+    prefetch: Math.max(maxSimultaneousRequests - 1, 1),
+    autoPrefetch: 3
   };
 
   var currentRequests = numRequests.interaction + numRequests.thumbnail + numRequests.prefetch;
@@ -2666,7 +2700,11 @@ function getNextRequest() {
     return requestPool.prefetch.shift();
   }
 
-  if (!requestPool.interaction.length && !requestPool.thumbnail.length && !requestPool.prefetch.length) {
+  if (requestPool.autoPrefetch.length && numRequests.autoPrefetch < maxNumRequests.autoPrefetch) {
+    return requestPool.autoPrefetch.shift();
+  }
+
+  if (!requestPool.interaction.length && !requestPool.thumbnail.length && !requestPool.prefetch.length && !requestPool.autoPrefetch.length) {
     awake = false;
   }
 
@@ -2677,11 +2715,22 @@ function getRequestPool() {
   return requestPool;
 }
 
+function getConfiguration() {
+  return configuration;
+}
+
+function setConfiguration(config) {
+  configuration = config;
+}
+
 exports.default = {
   addRequest: addRequest,
+  addPriorRequests: addPriorRequests,
   clearRequestStack: clearRequestStack,
   startGrabbing: startGrabbing,
-  getRequestPool: getRequestPool
+  getRequestPool: getRequestPool,
+  getConfiguration: getConfiguration,
+  setConfiguration: setConfiguration
 };
 
 /***/ }),
@@ -4242,6 +4291,7 @@ exports.default = function (element, newImageIdIndex) {
   }
 
   var startLoadingHandler = _loadHandlerManager2.default.getStartLoadHandler();
+  var displayLoadingHandler = _loadHandlerManager2.default.getDisplayLoadingHandler();
   var endLoadingHandler = _loadHandlerManager2.default.getEndLoadHandler();
   var errorLoadingHandler = _loadHandlerManager2.default.getErrorLoadingHandler();
   var viewport = cornerstone.getViewport(element);
@@ -4317,6 +4367,12 @@ exports.default = function (element, newImageIdIndex) {
     imagePromise = cornerstone.loadImage(newImageId);
   } else {
     imagePromise = cornerstone.loadAndCacheImage(newImageId);
+  }
+
+  if (displayLoadingHandler && (imagePromise === undefined || imagePromise.state() === 'pending')) {
+    var imageId = stackData.imageIds[newImageIdIndex];
+
+    displayLoadingHandler(element, imageId);
   }
 
   imagePromise.then(doneCallback, failCallback);
@@ -10957,6 +11013,12 @@ function mouseDown(e) {
     type: eventType
   };
 
+  var onMouseDown = $(element).data('onMouseDown');
+
+  if (onMouseDown) {
+    onMouseDown(eventData);
+  }
+
   var event = $.Event(eventType, eventData);
 
   $(eventData.element).trigger(event, eventData);
@@ -11001,7 +11063,10 @@ function mouseDown(e) {
       lastPoints: lastPoints,
       currentPoints: currentPoints,
       deltaPoints: deltaPoints,
-      type: eventType
+      type: eventType,
+      ctrlKey: e.ctrlKey,
+      metaKey: e.metaKey,
+      shiftKey: e.shiftKey
     };
 
     $(eventData.element).trigger(eventType, eventData);
@@ -12261,9 +12326,10 @@ function playClip(element, framesPerSecond) {
   var playClipAction = function playClipAction() {
 
     // Hoisting of context variables
-    var loader = void 0,
+    var imagePromise = void 0,
         viewport = void 0,
         startLoadingHandler = void 0,
+        displayLoadingHandler = void 0,
         endLoadingHandler = void 0,
         errorLoadingHandler = void 0,
         newImageIdIndex = stackData.currentImageIdIndex;
@@ -12295,6 +12361,7 @@ function playClip(element, framesPerSecond) {
     if (newImageIdIndex !== stackData.currentImageIdIndex) {
 
       startLoadingHandler = _loadHandlerManager2.default.getStartLoadHandler();
+      displayLoadingHandler = _loadHandlerManager2.default.getDisplayLoadingHandler();
       endLoadingHandler = _loadHandlerManager2.default.getEndLoadHandler();
       errorLoadingHandler = _loadHandlerManager2.default.getErrorLoadingHandler();
 
@@ -12305,12 +12372,18 @@ function playClip(element, framesPerSecond) {
       viewport = cornerstone.getViewport(element);
 
       if (stackData.preventCache === true) {
-        loader = cornerstone.loadImage(stackData.imageIds[newImageIdIndex]);
+        imagePromise = cornerstone.loadImage(stackData.imageIds[newImageIdIndex]);
       } else {
-        loader = cornerstone.loadAndCacheImage(stackData.imageIds[newImageIdIndex]);
+        imagePromise = cornerstone.loadAndCacheImage(stackData.imageIds[newImageIdIndex]);
       }
 
-      loader.then(function (image) {
+      if (displayLoadingHandler && (imagePromise === undefined || imagePromise.state() === 'pending')) {
+        var imageId = stackData.imageIds[newImageIdIndex];
+
+        displayLoadingHandler(element, imageId);
+      }
+
+      imagePromise.then(function (image) {
         stackData.currentImageIdIndex = newImageIdIndex;
         cornerstone.displayImage(element, image, viewport);
         if (endLoadingHandler) {
