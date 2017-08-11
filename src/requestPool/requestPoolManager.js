@@ -22,9 +22,9 @@ let maxNumRequests;
 let awake = false;
 const grabDelay = 20;
 
-function addRequest (element, imageId, type, preventCache, doneCallback, failCallback) {
+function addRequest (element, imageId, type, preventCache, doneCallback, failCallback, pendingCallback) {
   if (!requestPool.hasOwnProperty(type)) {
-    throw new Error('Request type must be one of interaction, thumbnail, or prefetch');
+    throw new Error('Request type must be one of interaction, thumbnail, prefetch, or autoPrefetch');
   }
 
   if (!element || !imageId) {
@@ -40,8 +40,21 @@ function addRequest (element, imageId, type, preventCache, doneCallback, failCal
     failCallback
   };
 
-      // If this imageId is in the cache, resolve it immediately
+  // Auto retry
+  if (configuration.retryLoad === true) {
+    const cachedImagePromise = cornerstone.imageCache.getImagePromise(imageId);
+
+    if (cachedImagePromise && cachedImagePromise.state() === 'rejected') {
+      cornerstone.imageCache.removeImagePromise(imageId);
+    }
+  }
+
+  // If this imageId is in the cache, resolve it immediately
   const imagePromise = cornerstone.imageCache.getImagePromise(imageId);
+
+  if (pendingCallback && (imagePromise === undefined || imagePromise.state() === 'pending')) {
+    pendingCallback();
+  }
 
   if (imagePromise) {
     imagePromise.then(function (image) {
@@ -53,7 +66,7 @@ function addRequest (element, imageId, type, preventCache, doneCallback, failCal
     return;
   }
 
-      // Add it to the end of the stack
+  // Add it to the end of the stack
   requestPool[type].push(requestDetails);
 }
 
