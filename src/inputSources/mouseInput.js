@@ -8,6 +8,24 @@ let isClickEvent = true;
 let preventClickTimeout;
 const clickDelay = 200;
 
+function getEventWhich (event) {
+  if (typeof event.buttons !== 'number') {
+    return event.which;
+  }
+
+  if (event.buttons === 0) {
+    return 0;
+  } else if (event.buttons % 2 === 1) {
+    return 1;
+  } else if (event.buttons % 4 === 2) {
+    return 3;
+  } else if (event.buttons % 8 === 4) {
+    return 2;
+  }
+
+  return 0;
+}
+
 function preventClickHandler () {
   isClickEvent = false;
 }
@@ -34,7 +52,7 @@ function mouseDoubleClick (e) {
   const lastPoints = copyPoints(startPoints);
   const eventData = {
     event: e,
-    which: e.which,
+    which: getEventWhich(e),
     viewport: cornerstone.getViewport(element),
     image: cornerstone.getEnabledElement(element).image,
     element,
@@ -76,7 +94,7 @@ function mouseDown (e) {
   let lastPoints = copyPoints(startPoints);
   const eventData = {
     event: e,
-    which: e.which,
+    which: getEventWhich(e),
     viewport: cornerstone.getViewport(element),
     image: cornerstone.getEnabledElement(element).image,
     element,
@@ -101,7 +119,7 @@ function mouseDown (e) {
     }
   }
 
-  const whichMouseButton = e.which;
+  const whichMouseButton = getEventWhich(e);
 
   function onMouseMove (e) {
         // Calculate our current points in page and image coordinates
@@ -229,7 +247,7 @@ function mouseMove (e) {
 
   let lastPoints = copyPoints(startPoints);
 
-  const whichMouseButton = e.which;
+  const whichMouseButton = getEventWhich(e);
 
     // Calculate our current points in page and image coordinates
   const currentPoints = {
