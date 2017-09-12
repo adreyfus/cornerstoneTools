@@ -7,7 +7,7 @@ export default class FusionRenderer {
     this.findImageFn = undefined;
   }
 
-  render (element, imageStacks, viewport) {
+  render (element, imageStacks) {
     // Move this to base Renderer class
     if (!Number.isInteger(this.currentImageIdIndex)) {
       throw new Error('FusionRenderer: render - Image ID Index is not an integer');
