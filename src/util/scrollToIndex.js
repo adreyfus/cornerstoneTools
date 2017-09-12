@@ -52,7 +52,7 @@ export default function (element, newImageIdIndex, force) {
 
     if (stackRenderer) {
       stackRenderer.currentImageIdIndex = newImageIdIndex;
-      stackRenderer.render(element, toolData.data);
+      stackRenderer.render(element, toolData.data, viewport);
     } else {
       cornerstone.displayImage(element, image, viewport);
     }
