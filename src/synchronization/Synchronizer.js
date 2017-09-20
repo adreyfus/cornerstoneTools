@@ -274,6 +274,22 @@ function Synchronizer (event, handler) {
     });
   };
 
+  /**
+   * Enables the Synchronizer for the given element
+   */
+  this.enable = function (element) {
+    $(element).off(event, onEvent);
+    $(element).on(event, onEvent);
+  };
+
+  /**
+   * Disables the Synchronizer for the given element
+   */
+  this.disable = function (element) {
+    // Stop listening for the event
+    $(element).off(event, onEvent);
+  };
+
   this.destroy = function () {
     const elements = $.unique(sourceElements.concat(targetElements));
 
