@@ -247,6 +247,11 @@ function playClip (element, framesPerSecond) {
         }
       };
 
+      const eventData = {
+        newImageIdIndex,
+        direction: newImageIdIndex - stackData.currentImageIdIndex
+      };
+
       stackData.currentImageIdIndex = newImageIdIndex;
       const newImageId = stackData.imageIds[newImageIdIndex];
 
@@ -275,6 +280,8 @@ function playClip (element, framesPerSecond) {
 
         // Make sure we kick off any changed download request pools
       requestPoolManager.startGrabbing();
+
+      $(element).trigger('CornerstoneClipScroll', eventData);
     }
   };
 
