@@ -50,11 +50,11 @@ export default function (element, newImageIdIndex) {
       return;
     }
 
+    cornerstone.displayImage(element, image, viewport);
+
     if (stackRenderer) {
       stackRenderer.currentImageIdIndex = newImageIdIndex;
       stackRenderer.render(element, toolData.data, viewport);
-    } else {
-      cornerstone.displayImage(element, image, viewport);
     }
 
     if (endLoadingHandler) {
