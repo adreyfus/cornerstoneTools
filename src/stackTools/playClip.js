@@ -169,8 +169,7 @@ function playClip (element, framesPerSecond) {
   const playClipAction = () => {
 
         // Hoisting of context variables
-    let viewport,
-      startLoadingHandler,
+    let startLoadingHandler,
       displayLoadingHandler,
       endLoadingHandler,
       errorLoadingHandler,
@@ -211,16 +210,14 @@ function playClip (element, framesPerSecond) {
         startLoadingHandler(element);
       }
 
-      viewport = cornerstone.getViewport(element);
-
       const doneCallback = function (image) {
         if (stackData.currentImageIdIndex === newImageIdIndex) {
           try {
-            cornerstone.displayImage(element, image, viewport);
+            cornerstone.displayImage(element, image);
 
             if (stackRenderer) {
               stackRenderer.currentImageIdIndex = newImageIdIndex;
-              stackRenderer.render(element, stackToolData.data, viewport);
+              stackRenderer.render(element, stackToolData.data);
             }
 
             if (endLoadingHandler) {

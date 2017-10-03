@@ -34,7 +34,6 @@ export default function (element, newImageIdIndex) {
   const displayLoadingHandler = loadHandlerManager.getDisplayLoadingHandler();
   const endLoadingHandler = loadHandlerManager.getEndLoadHandler();
   const errorLoadingHandler = loadHandlerManager.getErrorLoadingHandler();
-  const viewport = cornerstone.getViewport(element);
 
   function doneCallback (image) {
     if (stackData.currentImageIdIndex !== newImageIdIndex) {
@@ -50,11 +49,11 @@ export default function (element, newImageIdIndex) {
       return;
     }
 
-    cornerstone.displayImage(element, image, viewport);
+    cornerstone.displayImage(element, image);
 
     if (stackRenderer) {
       stackRenderer.currentImageIdIndex = newImageIdIndex;
-      stackRenderer.render(element, toolData.data, viewport);
+      stackRenderer.render(element, toolData.data);
     }
 
     if (endLoadingHandler) {
