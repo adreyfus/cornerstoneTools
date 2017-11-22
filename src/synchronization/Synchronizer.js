@@ -276,7 +276,7 @@ function Synchronizer (event, handler) {
   /**
    * Enables the Synchronizer for the given element
    */
-  this.enableElement = function (element) {
+  this.enable = function (element) {
     $(element).off(event, onEvent);
     $(element).on(event, onEvent);
   };
@@ -284,27 +284,9 @@ function Synchronizer (event, handler) {
   /**
    * Disables the Synchronizer for the given element
    */
-  this.disableElement = function (element) {
+  this.disable = function (element) {
     // Stop listening for the event
     $(element).off(event, onEvent);
-  };
-
-  /**
-   * Enables the Synchronizer for all the source elements
-   */
-  this.enable = function () {
-    for (let i = 0; i < sourceElements.length; i++) {
-      this.enableElement(sourceElements[i]);
-    }
-  };
-
-  /**
-   * Disables the Synchronizer for all the source elements
-   */
-  this.disable = function () {
-    for (let i = 0; i < sourceElements.length; i++) {
-      this.disableElement(sourceElements[i]);
-    }
   };
 
   this.destroy = function () {
