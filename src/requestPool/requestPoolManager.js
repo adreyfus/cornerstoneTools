@@ -1,30 +1,32 @@
 import external from '../externalModules.js';
 import { getMaxSimultaneousRequests } from '../util/getMaxSimultaneousRequests.js';
 
+let configuration = {};
+
 const requestPool = {
   interaction: [],
   thumbnail: [],
-  prefetch: []
+  prefetch: [],
+  autoPrefetch: []
 };
 
 const numRequests = {
   interaction: 0,
   thumbnail: 0,
-  prefetch: 0
+  prefetch: 0,
+  autoPrefetch: 0
 };
 
-let maxNumRequests = {
-  interaction: 6,
-  thumbnail: 6,
-  prefetch: 5
-};
+let maxNumRequests;
 
 let awake = false;
 const grabDelay = 20;
 
-function addRequest (element, imageId, type, preventCache, doneCallback, failCallback) {
+const countRetries = {};
+
+function addRequest (element, imageId, type, preventCache, doneCallback, failCallback, pendingCallback) {
   if (!requestPool.hasOwnProperty(type)) {
-    throw new Error('Request type must be one of interaction, thumbnail, or prefetch');
+    throw new Error('Request type must be one of interaction, thumbnail, prefetch, or autoPrefetch');
   }
 
   if (!element || !imageId) {
@@ -40,8 +42,25 @@ function addRequest (element, imageId, type, preventCache, doneCallback, failCal
     failCallback
   };
 
+  // Auto retry
+  if (configuration.maxRetries > 0 && countRetries[imageId] === undefined) {
+    countRetries[imageId] = 0;
+  }
+  if (configuration.maxRetries > 0 && countRetries[imageId] < configuration.maxRetries) {
+    const cachedImageLoadObject = external.cornerstone.imageCache.getImageLoadObject(imageId);
+
+    if (cachedImageLoadObject && cachedImageLoadObject.promise.state() === 'rejected') {
+      external.cornerstone.imageCache.removeImageLoadObject(imageId);
+      countRetries[imageId]++;
+    }
+  }
+
   // If this imageId is in the cache, resolve it immediately
   const imageLoadObject = external.cornerstone.imageCache.getImageLoadObject(imageId);
+
+  if (pendingCallback && (imageLoadObject === undefined || imageLoadObject.promise.state() === 'pending')) {
+    pendingCallback();
+  }
 
   if (imageLoadObject) {
     imageLoadObject.promise.then(function (image) {
@@ -55,6 +74,24 @@ function addRequest (element, imageId, type, preventCache, doneCallback, failCal
 
   // Add it to the end of the stack
   requestPool[type].push(requestDetails);
+}
+
+function addPriorRequests (element, imageIdList, requestType, preventCache, doneCallback, failCallback, pendingCallback) {
+  // Save the previously queued requests
+  const oldRequestQueue = getRequestPool()[requestType].slice();
+
+  // Clear the requests queue
+  clearRequestStack(requestType);
+
+  // Add the prior requests
+  for (let i = 0; i < imageIdList.length; i++) {
+    const imageId = imageIdList[i];
+
+    addRequest(element, imageId, requestType, preventCache, doneCallback, failCallback, pendingCallback);
+  }
+
+  // Add the previously queued requests
+  Array.prototype.push.apply(getRequestPool()[requestType], oldRequestQueue);
 }
 
 function clearRequestStack (type) {
@@ -157,7 +194,8 @@ function startGrabbing () {
   maxNumRequests = {
     interaction: Math.max(maxSimultaneousRequests, 1),
     thumbnail: Math.max(maxSimultaneousRequests - 2, 1),
-    prefetch: Math.max(maxSimultaneousRequests - 1, 1)
+    prefetch: Math.max(maxSimultaneousRequests - 1, 1),
+    autoPrefetch: Math.max(maxSimultaneousRequests - 1, 1)
   };
 
   const currentRequests = numRequests.interaction +
@@ -187,9 +225,14 @@ function getNextRequest () {
     return requestPool.prefetch.shift();
   }
 
+  if (requestPool.autoPrefetch.length && numRequests.autoPrefetch < maxNumRequests.autoPrefetch) {
+    return requestPool.autoPrefetch.shift();
+  }
+
   if (!requestPool.interaction.length &&
           !requestPool.thumbnail.length &&
-          !requestPool.prefetch.length) {
+          !requestPool.prefetch.length &&
+          !requestPool.autoPrefetch.length) {
     awake = false;
   }
 
@@ -200,9 +243,20 @@ function getRequestPool () {
   return requestPool;
 }
 
+function getConfiguration () {
+  return configuration;
+}
+
+function setConfiguration (config) {
+  configuration = config;
+}
+
 export default {
   addRequest,
+  addPriorRequests,
   clearRequestStack,
   startGrabbing,
-  getRequestPool
+  getRequestPool,
+  getConfiguration,
+  setConfiguration
 };
