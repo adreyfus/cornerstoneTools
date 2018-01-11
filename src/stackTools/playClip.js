@@ -221,12 +221,13 @@ function playClip (element, framesPerSecond) {
       loader.then(function (image) {
         try {
           stackData.currentImageIdIndex = newImageIdIndex;
+          cornerstone.displayImage(element, image);
+
           if (stackRenderer) {
             stackRenderer.currentImageIdIndex = newImageIdIndex;
             stackRenderer.render(element, stackToolData.data);
-          } else {
-            cornerstone.displayImage(element, image);
           }
+
           if (endLoadingHandler) {
             endLoadingHandler(element, image);
           }

@@ -44,8 +44,7 @@ export default class FusionRenderer {
         this.layerIds.push(baseLayerId);
       }
 
-      // Display the image immediately while the overlay images are identified
-      cornerstone.displayImage(element, baseImage);
+      cornerstone.updateImage(element);
 
       // Loop through the remaining 'overlay' image stacks
       overlayImageStacks.forEach((imgObj, overlayLayerIndex) => {
