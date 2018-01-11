@@ -207,6 +207,11 @@ function playClip (element, framesPerSecond) {
         startLoadingHandler(element);
       }
 
+      const eventData = {
+        newImageIdIndex,
+        direction: newImageIdIndex - stackData.currentImageIdIndex
+      };
+
       if (stackData.preventCache === true) {
         loader = cornerstone.loadImage(stackData.imageIds[newImageIdIndex]);
       } else {
@@ -236,6 +241,7 @@ function playClip (element, framesPerSecond) {
         }
       });
 
+      triggerEvent(element, 'CornerstoneClipScroll', eventData);
     }
 
   };
