@@ -74,6 +74,9 @@ function addRequest (element, imageId, type, preventCache, doneCallback, failCal
 
   // Add it to the end of the stack
   requestPool[type].push(requestDetails);
+
+  // Wake up
+  awake = true;
 }
 
 function addPriorRequests (element, imageIdList, requestType, preventCache, doneCallback, failCallback, pendingCallback) {
