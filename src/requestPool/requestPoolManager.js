@@ -1,8 +1,6 @@
 import external from '../externalModules.js';
 import { getMaxSimultaneousRequests } from '../util/getMaxSimultaneousRequests.js';
 
-let configuration = {};
-
 const requestPool = {
   interaction: [],
   thumbnail: [],
@@ -227,20 +225,10 @@ function getRequestPool () {
   return requestPool;
 }
 
-function getConfiguration () {
-  return configuration;
-}
-
-function setConfiguration (config) {
-  configuration = config;
-}
-
 export default {
   addRequest,
   addPriorRequests,
   clearRequestStack,
   startGrabbing,
-  getRequestPool,
-  getConfiguration,
-  setConfiguration
+  getRequestPool
 };
