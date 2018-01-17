@@ -1,30 +1,82 @@
 import external from '../externalModules.js';
 import { getMaxSimultaneousRequests } from '../util/getMaxSimultaneousRequests.js';
 
-const requestPool = {
-  interaction: [],
-  thumbnail: [],
-  prefetch: []
-};
-
-const numRequests = {
-  interaction: 0,
-  thumbnail: 0,
-  prefetch: 0
-};
-
-let maxNumRequests = {
-  interaction: 6,
-  thumbnail: 6,
-  prefetch: 5
-};
+const requestPoolTypes = [];
+const requestPool = {};
+const numRequests = {};
 
 let awake = false;
 const grabDelay = 20;
 
+function addRequestPoolType (name, priority, maxRequests) {
+  const newRequestPoolType = {
+    name,
+    priority,
+    maxRequests
+  };
+
+  const index = getIndex(priority);
+
+  requestPoolTypes.splice(index, 0, newRequestPoolType);
+
+  if (requestPool[name] === undefined) {
+    requestPool[name] = [];
+  }
+  if (numRequests[numRequests] === undefined) {
+    numRequests[name] = 0;
+  }
+}
+
+function getIndex (priority) {
+  let index;
+
+  for (index = 0; index < requestPoolTypes.length; index++) {
+    if (requestPoolTypes[index].priority < priority) {
+      return index;
+    }
+  }
+
+  return index;
+}
+
+// Add default types
+addRequestPoolType('interaction', 30, function () {
+  const maxSimultaneousRequests = getMaxSimultaneousRequests();
+
+  return Math.max(maxSimultaneousRequests, 1);
+});
+addRequestPoolType('thumbnail', 20, function () {
+  const maxSimultaneousRequests = getMaxSimultaneousRequests();
+
+  return Math.max(maxSimultaneousRequests - 2, 1);
+});
+addRequestPoolType('prefetch', 10, function () {
+  const maxSimultaneousRequests = getMaxSimultaneousRequests();
+
+  return Math.max(maxSimultaneousRequests - 1, 1);
+});
+
+function getMaxRequests (index) {
+  if (requestPoolTypes[index] === undefined) {
+    return undefined;
+  }
+
+  const maxRequests = requestPoolTypes[index].maxRequests;
+
+  if (typeof maxRequests === 'function') {
+    return maxRequests();
+  }
+
+  return maxRequests;
+}
+
+function getRequestPoolTypes () {
+  return requestPoolTypes;
+}
+
 function addRequest (element, imageId, type, preventCache, doneCallback, failCallback, addToBeginning) {
   if (!requestPool.hasOwnProperty(type)) {
-    throw new Error('Request type must be one of interaction, thumbnail, or prefetch');
+    throw new Error(`Request type ${type} is not defined`);
   }
 
   if (!element || !imageId) {
@@ -66,9 +118,8 @@ function addRequest (element, imageId, type, preventCache, doneCallback, failCal
 }
 
 function clearRequestStack (type) {
-  // Console.log('clearRequestStack');
   if (!requestPool.hasOwnProperty(type)) {
-    throw new Error('Request type must be one of interaction, thumbnail, or prefetch');
+    throw new Error(`Request type ${type} is not defined`);
   }
 
   requestPool[type] = [];
@@ -162,12 +213,6 @@ function startGrabbing () {
   // Begin by grabbing X images
   const maxSimultaneousRequests = getMaxSimultaneousRequests();
 
-  maxNumRequests = {
-    interaction: Math.max(maxSimultaneousRequests, 1),
-    thumbnail: Math.max(maxSimultaneousRequests - 2, 1),
-    prefetch: Math.max(maxSimultaneousRequests - 1, 1)
-  };
-
   const currentRequests = numRequests.interaction +
           numRequests.thumbnail +
           numRequests.prefetch;
@@ -183,21 +228,22 @@ function startGrabbing () {
 }
 
 function getNextRequest () {
-  if (requestPool.interaction.length && numRequests.interaction < maxNumRequests.interaction) {
-    return requestPool.interaction.shift();
+  let hasRequestsInQueue = false;
+
+  for (let i = 0; i < requestPoolTypes.length; i++) {
+    const name = requestPoolTypes[i].name;
+    const hasPooledRequests = requestPool[name].length > 0;
+    const isUnderMaxActiveRequests = numRequests[name] < getMaxRequests(i);
+
+    if (hasPooledRequests && isUnderMaxActiveRequests) {
+      return requestPool[name].shift();
+    }
+    if (hasPooledRequests) {
+      hasRequestsInQueue = true;
+    }
   }
 
-  if (requestPool.thumbnail.length && numRequests.thumbnail < maxNumRequests.thumbnail) {
-    return requestPool.thumbnail.shift();
-  }
-
-  if (requestPool.prefetch.length && numRequests.prefetch < maxNumRequests.prefetch) {
-    return requestPool.prefetch.shift();
-  }
-
-  if (!requestPool.interaction.length &&
-          !requestPool.thumbnail.length &&
-          !requestPool.prefetch.length) {
+  if (!hasRequestsInQueue) {
     awake = false;
   }
 
@@ -209,6 +255,8 @@ function getRequestPool () {
 }
 
 export default {
+  addRequestPoolType,
+  getRequestPoolTypes,
   addRequest,
   clearRequestStack,
   startGrabbing,
