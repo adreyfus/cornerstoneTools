@@ -3,6 +3,7 @@ import EVENTS from '../events.js';
 import external from '../externalModules.js';
 import loadHandlerManager from '../stateManagement/loadHandlerManager.js';
 import { addToolState, getToolState } from '../stateManagement/toolState.js';
+import requestPoolManager from '../requestPool/requestPoolManager.js';
 import triggerEvent from '../util/triggerEvent.js';
 
 const toolType = 'playClip';
@@ -167,11 +168,7 @@ function playClip (element, framesPerSecond) {
   const playClipAction = () => {
 
     // Hoisting of context variables
-    let loader,
-      startLoadingHandler,
-      endLoadingHandler,
-      errorLoadingHandler,
-      newImageIdIndex = stackData.currentImageIdIndex;
+    let newImageIdIndex = stackData.currentImageIdIndex;
 
     const imageCount = stackData.imageIds.length;
 
@@ -197,54 +194,75 @@ function playClip (element, framesPerSecond) {
       newImageIdIndex = imageCount - 1;
     }
 
-    if (newImageIdIndex !== stackData.currentImageIdIndex) {
-
-      startLoadingHandler = loadHandlerManager.getStartLoadHandler();
-      endLoadingHandler = loadHandlerManager.getEndLoadHandler();
-      errorLoadingHandler = loadHandlerManager.getErrorLoadingHandler();
-
-      if (startLoadingHandler) {
-        startLoadingHandler(element);
-      }
-
-      const eventData = {
-        newImageIdIndex,
-        direction: newImageIdIndex - stackData.currentImageIdIndex
-      };
-
-      if (stackData.preventCache === true) {
-        loader = cornerstone.loadImage(stackData.imageIds[newImageIdIndex]);
-      } else {
-        loader = cornerstone.loadAndCacheImage(stackData.imageIds[newImageIdIndex]);
-      }
-
-      loader.then(function (image) {
-        try {
-          stackData.currentImageIdIndex = newImageIdIndex;
-          cornerstone.displayImage(element, image);
-
-          if (stackRenderer) {
-            stackRenderer.currentImageIdIndex = newImageIdIndex;
-            stackRenderer.render(element, stackToolData.data);
-          }
-
-          if (endLoadingHandler) {
-            endLoadingHandler(element, image);
-          }
-        } catch (error) {
-          return;
-        }
-      }, function (error) {
-        const imageId = stackData.imageIds[newImageIdIndex];
-
-        if (errorLoadingHandler) {
-          errorLoadingHandler(element, imageId, error);
-        }
-      });
-
-      triggerEvent(element, EVENTS.CLIP_SCROLLED, eventData);
+    if (newImageIdIndex === stackData.currentImageIdIndex) {
+      return;
     }
 
+    const startLoadingHandler = loadHandlerManager.getStartLoadHandler();
+    const endLoadingHandler = loadHandlerManager.getEndLoadHandler();
+    const errorLoadingHandler = loadHandlerManager.getErrorLoadingHandler();
+
+    function doneCallback (image) {
+      if (stackData.currentImageIdIndex !== newImageIdIndex) {
+        return;
+      }
+
+      // Check if the element is still enabled in Cornerstone,
+      // If an error is thrown, stop here.
+      try {
+        // TODO: Add 'isElementEnabled' to Cornerstone?
+        cornerstone.getEnabledElement(element);
+      } catch(error) {
+        return;
+      }
+
+      cornerstone.displayImage(element, image);
+
+      if (stackRenderer) {
+        stackRenderer.currentImageIdIndex = newImageIdIndex;
+        stackRenderer.render(element, stackToolData.data);
+      }
+
+      if (endLoadingHandler) {
+        endLoadingHandler(element, image);
+      }
+    }
+
+    function failCallback (error) {
+      const imageId = stackData.imageIds[newImageIdIndex];
+
+      if (errorLoadingHandler) {
+        errorLoadingHandler(element, imageId, error);
+      }
+    }
+
+    const eventData = {
+      newImageIdIndex,
+      direction: newImageIdIndex - stackData.currentImageIdIndex
+    };
+
+    stackData.currentImageIdIndex = newImageIdIndex;
+    const newImageId = stackData.imageIds[newImageIdIndex];
+
+    if (startLoadingHandler) {
+      startLoadingHandler(element);
+    }
+
+    // Convert the preventCache value in stack data to a boolean
+    const preventCache = Boolean(stackData.preventCache);
+
+    const type = 'interaction';
+
+    // Clear the interaction queue
+    requestPoolManager.clearRequestStack(type);
+
+    // Request the image
+    requestPoolManager.addRequest(element, newImageId, type, preventCache, doneCallback, failCallback);
+
+    // Make sure we kick off any changed download request pools
+    requestPoolManager.startGrabbing();
+
+    triggerEvent(element, EVENTS.CLIP_SCROLLED, eventData);
   };
 
     // If playClipTimeouts array is available, not empty and its elements are NOT uniform ...

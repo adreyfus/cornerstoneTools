@@ -102,15 +102,14 @@ export default function (element, newImageIdIndex) {
   // Convert the preventCache value in stack data to a boolean
   const preventCache = Boolean(stackData.preventCache);
 
-  let imagePromise;
+  const type = 'interaction';
 
-  if (preventCache) {
-    imagePromise = cornerstone.loadImage(newImageId);
-  } else {
-    imagePromise = cornerstone.loadAndCacheImage(newImageId);
-  }
+  // Clear the interaction queue
+  requestPoolManager.clearRequestStack(type);
 
-  imagePromise.then(doneCallback, failCallback);
+  // Request the image
+  requestPoolManager.addRequest(element, newImageId, type, preventCache, doneCallback, failCallback);
+
   // Make sure we kick off any changed download request pools
   requestPoolManager.startGrabbing();
 
