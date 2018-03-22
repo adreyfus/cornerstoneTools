@@ -4,6 +4,7 @@ import { getMaxSimultaneousRequests } from '../util/getMaxSimultaneousRequests.j
 const requestPoolTypes = [];
 const requestPool = {};
 const numRequests = {};
+const activeRequests = {};
 
 let awake = false;
 const grabDelay = 20;
@@ -135,17 +136,27 @@ function startAgain () {
   }, grabDelay);
 }
 
+function requestTypeToLoadPriority (requestDetails) {
+  if (requestDetails.type === 'prefetch') {
+    return -5;
+  } else if (requestDetails.type === 'interactive') {
+    return 0;
+  } else if (requestDetails.type === 'thumbnail') {
+    return 5;
+  }
+}
+
 function sendRequest (requestDetails) {
   const cornerstone = external.cornerstone;
   // Increment the number of current requests of this type
   const type = requestDetails.type;
-
-  numRequests[type]++;
-
-  awake = true;
   const imageId = requestDetails.imageId;
   const doneCallback = requestDetails.doneCallback;
   const failCallback = requestDetails.failCallback;
+
+  incrementActiveRequest(imageId, type);
+
+  awake = true;
 
   // Check if we already have this image promise in the cache
   const imageLoadObject = cornerstone.imageCache.getImageLoadObject(imageId);
@@ -154,29 +165,19 @@ function sendRequest (requestDetails) {
     // If we do, remove from list (when resolved, as we could have
     // Pending prefetch requests) and stop processing this iteration
     imageLoadObject.promise.then(function (image) {
-      numRequests[type]--;
+      decrementActiveRequest(imageId, type);
       // Console.log(numRequests);
 
       doneCallback(image);
       startAgain();
     }, function (error) {
-      numRequests[type]--;
+      decrementActiveRequest(imageId, type);
       // Console.log(numRequests);
       failCallback(error);
       startAgain();
     });
 
     return;
-  }
-
-  function requestTypeToLoadPriority (requestDetails) {
-    if (requestDetails.type === 'prefetch') {
-      return -5;
-    } else if (requestDetails.type === 'interactive') {
-      return 0;
-    } else if (requestDetails.type === 'thumbnail') {
-      return 5;
-    }
   }
 
   const priority = requestTypeToLoadPriority(requestDetails);
@@ -197,12 +198,12 @@ function sendRequest (requestDetails) {
 
   // Load and cache the image
   loader.then(function (image) {
-    numRequests[type]--;
+    decrementActiveRequest(imageId, type);
     // Console.log(numRequests);
     doneCallback(image);
     startAgain();
   }, function (error) {
-    numRequests[type]--;
+    decrementActiveRequest(imageId, type);
     // Console.log(numRequests);
     failCallback(error);
     startAgain();
@@ -256,11 +257,34 @@ function getRequestPool () {
   return requestPool;
 }
 
+function incrementActiveRequest (requestId, type) {
+  if (activeRequests[requestId] === undefined) {
+    activeRequests[requestId] = 0;
+  }
+
+  activeRequests[requestId]++;
+  numRequests[type]++;
+}
+
+function decrementActiveRequest (requestId, type) {
+  activeRequests[requestId]--;
+  numRequests[type]--;
+
+  if (activeRequests[requestId] === 0) {
+    delete activeRequests[requestId];
+  }
+}
+
+function isActive (requestId) {
+  return activeRequests[requestId] > 0;
+}
+
 export default {
   addRequestPoolType,
   getRequestPoolTypes,
   addRequest,
   clearRequestStack,
   startGrabbing,
-  getRequestPool
+  getRequestPool,
+  isActive
 };
