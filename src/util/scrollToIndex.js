@@ -82,7 +82,7 @@ export default function (element, newImageIdIndex) {
   const newImageId = stackData.imageIds[newImageIdIndex];
 
   if (startLoadingHandler) {
-    startLoadingHandler(element);
+    startLoadingHandler(element, newImageId);
   }
 
   // Retry image loading in cases where previous image promise
