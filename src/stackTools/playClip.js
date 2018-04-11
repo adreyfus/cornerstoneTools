@@ -245,7 +245,7 @@ function playClip (element, framesPerSecond) {
     const newImageId = stackData.imageIds[newImageIdIndex];
 
     if (startLoadingHandler) {
-      startLoadingHandler(element);
+      startLoadingHandler(element, newImageId);
     }
 
     // Convert the preventCache value in stack data to a boolean
