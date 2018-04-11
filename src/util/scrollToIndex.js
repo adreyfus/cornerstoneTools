@@ -81,13 +81,16 @@ export default function (element, newImageIdIndex, reloadSameIndex = false) {
   stackData.currentImageIdIndex = newImageIdIndex;
   const newImageId = stackData.imageIds[newImageIdIndex];
 
+  let imagePromise;
+
   if (startLoadingHandler) {
-    startLoadingHandler(element, newImageId);
+    imagePromise = startLoadingHandler(element, newImageId);
   }
 
-  // Retry image loading in cases where previous image promise
-  // Was rejected, if the option is set
-  /*
+  if (imagePromise === undefined) {
+    // Retry image loading in cases where previous image promise
+    // Was rejected, if the option is set
+    /*
 
     Const config = stackScroll.getConfiguration();
 
@@ -97,21 +100,25 @@ export default function (element, newImageIdIndex, reloadSameIndex = false) {
 
     if (config && config.retryLoadOnScroll === true) {
     }
-  */
+     */
 
-  // Convert the preventCache value in stack data to a boolean
-  const preventCache = Boolean(stackData.preventCache);
+    // Convert the preventCache value in stack data to a boolean
+    const preventCache = Boolean(stackData.preventCache);
 
-  const type = 'interaction';
+    const type = 'interaction';
 
-  // Clear the interaction queue
-  requestPoolManager.clearRequestStack(type);
+    // Clear the interaction queue
+    requestPoolManager.clearRequestStack(type);
 
-  // Request the image
-  requestPoolManager.addRequest(element, newImageId, type, preventCache, doneCallback, failCallback);
+    // Request the image
+    requestPoolManager.addRequest(element, newImageId, type, preventCache, doneCallback, failCallback);
 
-  // Make sure we kick off any changed download request pools
-  requestPoolManager.startGrabbing();
+    // Make sure we kick off any changed download request pools
+    requestPoolManager.startGrabbing();
+  } else {
+    // StartLoadingHandler returned the image promise
+    imagePromise.then(doneCallback, failCallback);
+  }
 
   triggerEvent(element, EVENTS.STACK_SCROLL, eventData);
 }
