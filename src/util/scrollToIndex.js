@@ -5,7 +5,7 @@ import requestPoolManager from '../requestPool/requestPoolManager.js';
 import loadHandlerManager from '../stateManagement/loadHandlerManager.js';
 import triggerEvent from '../util/triggerEvent.js';
 
-export default function (element, newImageIdIndex) {
+export default function (element, newImageIdIndex, reloadSameIndex = false) {
   const toolData = getToolState(element, 'stack');
 
   if (!toolData || !toolData.data || !toolData.data.length) {
@@ -69,7 +69,7 @@ export default function (element, newImageIdIndex) {
     }
   }
 
-  if (newImageIdIndex === stackData.currentImageIdIndex) {
+  if (newImageIdIndex === stackData.currentImageIdIndex && !reloadSameIndex) {
     return;
   }
 
